@@ -1,0 +1,68 @@
+label start
+
+# Começa com tudo escondido
+@hide target=bg
+@hide target=textbox
+@hide target=sprite name=KuroNeko
+
+# Mostra o background primeiro
+@show target=bg name=Scene1_Street
+
+# Mostra a KuroNeko
+@show target=sprite name=KuroNeko expression=neutral pos=left
+
+# Mostra a caixa de texto e inicia o diálogo
+@show target=textbox
+
+KuroNeko:PlayerKun, d-de quem v-você é a favor? {speed=30}
+
+KuroNeko:Gostaria muito de saber a sua opinião... {speed=10}
+
+KuroNeko:Sabe...No fim das contas saber a decisão política do amiguinho também é uma forma de demonstrar amor e carinho... {speed=30}
+
+KuroNeko:Então? De quem você é a favor? {speed=30}
+
+PlayerKun:Caramba, é de fato tão importante assim saber a minha opinião política?
+
+@shake duration=0.1 intensity=1
+KuroNeko:Claro que Sim!!!
+
+KuroNeko:Deixe de besteira e me diga sua posição política!!!
+
+@menu
+* Aqui é 13 na veia!!! -> Lulala
+* Aqui é patriota na Veia, fé no Mito -> Mito_Mito
+* Nenhum dos dois... -> Pre_end
+
+label Lulala
+KuroNeko:[color=#ff0000]TEM QUE SER ASSIM MESMO COMPANHEIRO!!! O governo apoia seus atos.[/color]
+@play type=bgm name=peaceful
+@set mood=calm
+@jump to=loop
+
+label Mito_Mito
+KuroNeko:[color=#00ff27]Só mais 72 horas patriota!!! {speed=60}[/color]
+@jump to=loop
+
+label Pre_end
+KuroNeko:Nossa, como você é sem sal. Boa Sorte na escuridão...
+@jump to=end
+
+label loop
+@menu
+* Aqui é 13 na veia!!! -> Lulala
+* Aqui é patriota na Veia, fé no Mito -> Mito_Mito
+* Até quando vou ficar aqui?? -> Pre_end
+
+label Pre_end
+@shake duration=0.05 intensity=1
+PlayerKun:Chega!! Você concorda com tudo que eu digo!
+
+KuroNeko:Tá Bom...Aproveite sua estadia...no Void... 
+@jump to=end
+
+label end
+@stop type=bgm
+@hide target=textbox
+@hide target=sprite name=KuroNeko
+@hide target=bg
