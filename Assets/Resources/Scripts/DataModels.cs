@@ -1,11 +1,9 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace VisualNovelEngine
 {
     #region Data Models
     // Base node
-    using System.Collections.Generic;
-
     public abstract class ScriptNode
     {
         public int lineNumber;
@@ -33,12 +31,14 @@ namespace VisualNovelEngine
     public class MenuNode : ScriptNode
     {
         public List<MenuChoice> choices = new List<MenuChoice>();
+        public Dictionary<string, string> parameters = new Dictionary<string, string>(); // params declarados na propria linha @menu
     }
 
     public class MenuChoice
     {
         public string text;
         public string jumpTo; // label or null
+        public int lineNumber; // linha da escolha no script, usada nos diagnosticos
         public Dictionary<string, string> parameters = new Dictionary<string, string>();
     }
     #endregion

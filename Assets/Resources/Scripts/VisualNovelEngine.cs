@@ -166,6 +166,7 @@ namespace VisualNovelEngine
         private bool isTyping = false;
         private bool isWaitingForInput = false;
         private bool isInMenu = false;
+        private int pendingChoiceIndex = -1; // escolha clicada, consumida por HandleMenuNode
         private Coroutine typingCoroutine;
         private Coroutine autoAdvanceCoroutine;
         private Coroutine backgroundFadeCoroutine;
@@ -369,10 +370,56 @@ namespace VisualNovelEngine
 
             StopAllCoroutines();
 
-            nodes = ScriptParser.Parse(text);
+            nodes = ScriptParser.Parse(text, out var diagnostics);
+            ReportDiagnostics(path, diagnostics);
             IndexLabels();
             state = new EngineState();
             StartCoroutine(RunFromIndex(0));
+        }
+
+        /// <summary>
+        /// Loga tudo que o parser encontrou de errado no carregamento, em vez de deixar
+        /// o erro aparecer no meio da gameplay. Acrescenta as validações que só podem ser
+        /// feitas aqui, porque dependem da cena (número de posições de escolha).
+        /// </summary>
+        void ReportDiagnostics(string path, List<ParseDiagnostic> diagnostics)
+        {
+            int capacity = choicePositions != null ? choicePositions.Length : 0;
+            if (capacity > 0)
+            {
+                foreach (var node in nodes)
+                {
+                    if (node is MenuNode mn && mn.choices.Count > capacity)
+                    {
+                        diagnostics.Add(new ParseDiagnostic()
+                        {
+                            line = mn.lineNumber,
+                            severity = DiagnosticSeverity.Error,
+                            message = $"Menu com {mn.choices.Count} escolhas excede as {capacity} posições disponíveis na cena."
+                        });
+                    }
+                }
+            }
+
+            if (diagnostics.Count == 0) return;
+
+            int errors = 0;
+            int warnings = 0;
+            foreach (var d in diagnostics)
+            {
+                if (d.severity == DiagnosticSeverity.Error)
+                {
+                    errors++;
+                    Debug.LogError($"[Script] {path} {d}");
+                }
+                else
+                {
+                    warnings++;
+                    Debug.LogWarning($"[Script] {path} {d}");
+                }
+            }
+
+            Debug.Log($"[Script] {path}: {errors} erro(s), {warnings} aviso(s).");
         }
 
         void IndexLabels()
@@ -391,6 +438,15 @@ namespace VisualNovelEngine
         #region Execution
         IEnumerator RunFromIndex(int startIndex)
         {
+            // Um recomeço (load, JumpToNextChoice) pode ter matado um HandleMenuNode no meio:
+            // garante que não sobre menu aberto nem input travado.
+            if (isInMenu)
+            {
+                isInMenu = false;
+                HideMenuUI();
+            }
+            pendingChoiceIndex = -1;
+
             state.currentNodeIndex = startIndex;
             while (state.currentNodeIndex < nodes.Count)
             {
@@ -811,59 +867,75 @@ namespace VisualNovelEngine
 
         IEnumerator HandleMenuNode(MenuNode mn)
         {
-            isInMenu = true;
-
-            // Se há apenas uma escolha que pula imediatamente, escolhe automaticamente
-            if (mn.choices.Count == 1 && !string.IsNullOrEmpty(mn.choices[0].jumpTo))
+            // Casos degenerados: avança o índice para não prender RunFromIndex neste mesmo nó.
+            if (mn.choices.Count == 0)
             {
-                var ch = mn.choices[0];
-                foreach (var kv in ch.parameters)
-                {
-                    state.variables[kv.Key] = kv.Value;
-                }
-                JumpToLabel(ch.jumpTo);
-                isInMenu = false;
+                Debug.LogError($"@menu sem escolhas (linha {mn.lineNumber}). Menu ignorado.");
+                state.currentNodeIndex++;
                 yield break;
             }
 
             if (mn.choices.Count > choicePositions.Length)
             {
-                Debug.LogError($"Número de escolhas ({mn.choices.Count}) excede o número de posições disponíveis ({choicePositions.Length})");
+                Debug.LogError($"Número de escolhas ({mn.choices.Count}) excede o número de posições disponíveis ({choicePositions.Length}) na linha {mn.lineNumber}. Menu ignorado.");
+                state.currentNodeIndex++;
+                yield break;
+            }
+
+            isInMenu = true;
+            pendingChoiceIndex = -1;
+
+            // Se há apenas uma escolha que pula imediatamente, escolhe automaticamente
+            if (mn.choices.Count == 1 && !string.IsNullOrEmpty(mn.choices[0].jumpTo))
+            {
+                ApplyChoice(mn, 0);
+                isInMenu = false;
                 yield break;
             }
 
             // Mostrar menu na UI
             ShowMenuUI(mn.choices);
 
-            // Esperar até que uma escolha seja feita
-            int selectedChoice = -1;
-            while (selectedChoice == -1)
+            // Esperar até que uma escolha seja feita. OnChoiceSelected preenche pendingChoiceIndex.
+            while (pendingChoiceIndex == -1)
             {
                 yield return null;
             }
 
+            int selectedChoice = pendingChoiceIndex;
+            pendingChoiceIndex = -1;
+
             HideMenuUI();
+            ApplyChoice(mn, selectedChoice);
+            isInMenu = false;
+        }
 
-            if (selectedChoice >= 0 && selectedChoice < mn.choices.Count)
+        /// <summary>
+        /// Aplica a escolha (variáveis + destino) e deixa state.currentNodeIndex pronto
+        /// para RunFromIndex continuar. Sempre avança o índice, mesmo em erro, para não travar.
+        /// </summary>
+        void ApplyChoice(MenuNode mn, int choiceIndex)
+        {
+            if (choiceIndex < 0 || choiceIndex >= mn.choices.Count)
             {
-                var choice = mn.choices[selectedChoice];
-
-                foreach (var kv in choice.parameters)
-                {
-                    state.variables[kv.Key] = kv.Value;
-                }
-
-                if (!string.IsNullOrEmpty(choice.jumpTo))
-                {
-                    JumpToLabel(choice.jumpTo);
-                }
-                else
-                {
-                    state.currentNodeIndex++;
-                }
+                Debug.LogWarning($"Escolha inválida ({choiceIndex}) no menu da linha {mn.lineNumber}.");
+                state.currentNodeIndex++;
+                return;
             }
 
-            isInMenu = false;
+            var choice = mn.choices[choiceIndex];
+
+            foreach (var kv in choice.parameters)
+            {
+                state.variables[kv.Key] = kv.Value;
+            }
+
+            if (!string.IsNullOrEmpty(choice.jumpTo) && JumpToLabel(choice.jumpTo))
+            {
+                return; // JumpToLabel já posicionou currentNodeIndex
+            }
+
+            state.currentNodeIndex++;
         }
 
         void ShowMenuUI(List<MenuChoice> choices)
@@ -942,37 +1014,14 @@ namespace VisualNovelEngine
             currentChoiceButtons.Clear();
         }
 
-        // Método chamado quando um botão de escolha é clicado
+        // Método chamado quando um botão de escolha é clicado.
+        // Só registra a escolha: quem aplica é HandleMenuNode, que está esperando por ela.
         public void OnChoiceSelected(int choiceIndex)
         {
-            StopCoroutine("HandleMenuNode");
+            if (!isInMenu) return; // clique fora de um menu ativo
+            if (pendingChoiceIndex != -1) return; // menu já resolvido (clique duplo)
 
-            if (state.currentNodeIndex < nodes.Count && nodes[state.currentNodeIndex] is MenuNode mn)
-            {
-                if (choiceIndex >= 0 && choiceIndex < mn.choices.Count)
-                {
-                    var choice = mn.choices[choiceIndex];
-
-                    foreach (var kv in choice.parameters)
-                    {
-                        state.variables[kv.Key] = kv.Value;
-                    }
-
-                    HideMenuUI();
-
-                    if (!string.IsNullOrEmpty(choice.jumpTo))
-                    {
-                        JumpToLabel(choice.jumpTo);
-                    }
-                    else
-                    {
-                        state.currentNodeIndex++;
-                    }
-                }
-            }
-
-            isInMenu = false;
-            StartCoroutine(RunFromIndex(state.currentNodeIndex));
+            pendingChoiceIndex = choiceIndex;
         }
 
         #endregion
