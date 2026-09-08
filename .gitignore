@@ -4,6 +4,10 @@
 [Bb]uilds/
 KuroNekoBuild/
 [Ll]ogs/
+[Oo]bj/
+Logs/
+UserSettings/
+MemoryCaptures/
 obj/
 .vs/
 
