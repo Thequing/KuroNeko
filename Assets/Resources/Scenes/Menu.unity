@@ -4385,7 +4385,7 @@ MonoBehaviour:
     Music: 1
     Effects: 1
     fullscreen: 1
-    resolutionIndex: 0
+    resolutionIndex: -1
     language: pt-BR
 --- !u!1 &1844170893
 GameObject:
