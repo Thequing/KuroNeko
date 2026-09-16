@@ -11,7 +11,7 @@ public class GameSettings
     [Range(0f, 1f)] public float Effects = 1f;
 
     public bool fullscreen = true;
-    public int resolutionIndex = 0;
+    public int resolutionIndex = -1; // -1 = resolução nativa (não força SetResolution)
     public string language = "pt-BR";
 }
 
@@ -105,7 +105,8 @@ public class SettingsManager : MonoBehaviour
         // TELA
         Screen.fullScreen = settings.fullscreen;
 
-        // RESOLUÇÃO
+        // RESOLUÇÃO (Screen.resolutions é ordenado da menor para a maior;
+        // índice -1 mantém a resolução nativa em vez de forçar a menor)
         if (availableResolutions.Length > 0 &&
             settings.resolutionIndex >= 0 &&
             settings.resolutionIndex < availableResolutions.Length)

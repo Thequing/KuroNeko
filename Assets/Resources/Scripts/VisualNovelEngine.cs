@@ -122,7 +122,7 @@ namespace VisualNovelEngine
 
         [Header("Other")]
         public bool autoStart = true;
-        public string defaultScriptPath = "StreamingAssets/Scripts/Teste";
+        public string defaultScriptPath = "Resources/ScenesTXT/Teste";
 
         [Header("Auto Text Settings")]
         public bool AutoText = false; // Nova opção para texto automático

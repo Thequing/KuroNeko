@@ -2653,7 +2653,7 @@ MonoBehaviour:
   saveSlotsContainer: {fileID: 0}
   saveLoadMenu: {fileID: 0}
   autoStart: 1
-  defaultScriptPath: Assets/Resources/ScenesTXT/Teste.txt
+  defaultScriptPath: Resources/ScenesTXT/Teste
   AutoText: 0
   autoTextDelay: 2
   logPanel: {fileID: 713855936}
